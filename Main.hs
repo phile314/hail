@@ -75,18 +75,18 @@ main = do
   opts <- execParser optsParserInfo
   let profilePath = "/nix/var/nix/profiles" </> (profile opts)
       uri = jobURI opts
-      cont m_creds = case pollPeriod opts of
+  m_creds <- loadCredsFromNetrc (netrcFile opts) uri
+  createDirectoryIfMissing True $ takeDirectory profilePath
+  -- Try to activate on initial startup, but ignore failures.
+  activate profilePath ActivateIgnoreErrors
+  let cont = case pollPeriod opts of
         Nothing -> const $ return ()
         Just period -> \delay -> do
           case delay of
             Delay -> threadDelay $ minutesToMicroseconds period
             NoDelay -> return ()
-          pollLoop profilePath uri m_creds (cont m_creds)
-  m_creds <- loadCredsFromNetrc (netrcFile opts) uri
-  createDirectoryIfMissing True $ takeDirectory profilePath
-  -- Try to activate on initial startup, but ignore failures.
-  activate profilePath ActivateIgnoreErrors
-  cont m_creds NoDelay
+          pollLoop profilePath uri m_creds cont
+  pollLoop profilePath uri m_creds cont
 
 -- | Convert minutes to microseconds
 minutesToMicroseconds :: Int -> Int
