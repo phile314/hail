@@ -1,5 +1,5 @@
 name:                hail
-version:             0.1.0.1
+version:             0.1.0.2
 synopsis:
          A service for pull-based continuous deployment based on hydra.
 description:
