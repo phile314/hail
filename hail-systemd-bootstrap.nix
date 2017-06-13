@@ -122,4 +122,5 @@ in
         mkdir -p $out/bin
         ln -sv ${activate}/bin/activate $out/bin
         ln -sv ${hail-bin} $out/bin/hail
+        ln -sv ${nix}/bin/nix-env $out/bin/nix-env
       ''
