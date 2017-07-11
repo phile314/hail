@@ -13,9 +13,10 @@ import System.FilePath ((</>))
 -- Errors are logged to stderr.
 activate
   :: FilePath -- ^ The path to the profile
+  -> FilePath -- ^ Relative path to the activation script
   -> ActivateErrorMode
   -> IO ()
-activate profilePath error_mode = do
+activate profilePath activationScript error_mode = do
     e_pid <- tryIOError $ spawnProcess activateCommand []
     case e_pid of
       Left err ->
@@ -30,7 +31,7 @@ activate profilePath error_mode = do
     logger = case error_mode of
       ActivateIgnoreErrors -> const $ return ()
       ActivateReportErrors -> hPutStrLn stderr
-    activateCommand = profilePath </> "bin/activate"
+    activateCommand = profilePath </> activationScript
 
 -- | Settings for error handling for 'activate'.
 data ActivateErrorMode

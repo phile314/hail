@@ -27,6 +27,7 @@ data Opts = Opts
   , netrcFile :: Maybe FilePath -- ^ The netrc file for hydra access.
   , pollPeriod :: Maybe Int     -- ^ The period to poll the job, in
                                 -- minutes, or 'Nothing' for a oneshot.
+  , activationScript :: String  -- ^ The activation script path.
   }
 
 -- | Parser for the poll period command line flag
@@ -62,6 +63,13 @@ optsParser =  Opts
              <> metavar "NETRC_FILE"
              <> help "The netrc file for hydra HTTP access"))
           <*> (oneshotParser <|> pollPeriodParser)
+          <*> strOption
+              ( long "activation-script"
+             <> metavar "ACTIVATION_SCRIPT"
+             <> help "The path to the activation script"
+             <> value "bin/activate"
+             <> showDefault
+              )
 
 -- | Full command line parser with usage string.
 optsParserInfo :: ParserInfo Opts
@@ -78,15 +86,15 @@ main = do
   m_creds <- loadCredsFromNetrc (netrcFile opts) uri
   createDirectoryIfMissing True $ takeDirectory profilePath
   -- Try to activate on initial startup, but ignore failures.
-  activate profilePath ActivateIgnoreErrors
+  activate profilePath (activationScript opts) ActivateIgnoreErrors
   let cont = case pollPeriod opts of
         Nothing -> const $ return ()
         Just period -> \delay -> do
           case delay of
             Delay -> threadDelay $ minutesToMicroseconds period
             NoDelay -> return ()
-          pollLoop profilePath uri m_creds cont
-  pollLoop profilePath uri m_creds cont
+          pollLoop profilePath (activationScript opts) uri m_creds cont
+  pollLoop profilePath (activationScript opts) uri m_creds cont
 
 -- | Convert minutes to microseconds
 minutesToMicroseconds :: Int -> Int
@@ -98,11 +106,12 @@ data ShouldDelay = Delay | NoDelay
 
 -- | Poll hydra for new builds, with an explicit continuation
 pollLoop :: FilePath               -- ^ The profile path
+         -> FilePath               -- ^ The activation script
          -> String                 -- ^ The job URI
          -> Maybe Auth             -- ^ The creds for talking to hydra
          -> (ShouldDelay -> IO ()) -- ^ The continuation
          -> IO ()
-pollLoop profilePath uri m_creds cont =
+pollLoop profilePath actScript uri m_creds cont =
   getLatest uri m_creds >>= \case
     Left msg -> do
       hPutStrLn stderr msg
@@ -113,6 +122,6 @@ pollLoop profilePath uri m_creds cont =
         True -> do
           switchSucceeded <- switchProfile profilePath outPath
           when switchSucceeded $
-            activate profilePath ActivateReportErrors
+            activate profilePath actScript ActivateReportErrors
           cont NoDelay
         False -> cont Delay
