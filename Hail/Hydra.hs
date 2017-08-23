@@ -1,10 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Hail.Hydra where
 
-import Control.Exception (handle)
+import Control.Exception (handleJust)
 
 import Network.Wreq
-import Network.HTTP.Client (HttpException)
+import Network.HTTP.Client (HttpException (InvalidUrlException))
 import Data.Aeson.Lens
 import Control.Lens.Operators
 import Data.Text (unpack)
@@ -15,7 +15,7 @@ getLatest
   -> Maybe Auth -- ^ The credentials to talk to hydra.
   -> IO (Either String FilePath)
 getLatest uri m_creds =
-    handle (return . Left . (show :: HttpException -> String)) $ do
+    handleJust isTransientError (return . Left . (show :: HttpException -> String)) $ do
       r <- getWith opts latestUri
       let m_outPath = r ^? responseBody . key "buildoutputs"
                                         . key "out"
@@ -30,3 +30,7 @@ getLatest uri m_creds =
       "Latest build of job " ++ uri
                              ++ " has no output named 'out'."
     latestUri = uri ++ "/latest"
+
+    isTransientError e = case e of
+      InvalidUrlException _ _ -> Nothing
+      _ -> Just e
